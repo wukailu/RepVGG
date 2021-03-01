@@ -23,6 +23,7 @@ from repvgg import get_RepVGG_func_by_name
 
 IMAGENET_TRAINSET_SIZE = 1281167
 
+#  python train.py -a RepVGG-A0 --dist-url 'tcp://127.0.0.1:23333' --dist-backend 'nccl' --multiprocessing-distributed --world-size 1 --rank 0 --workers 32 /data/ImageNet --wd 0.0005
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('data', metavar='DIR',
@@ -46,8 +47,8 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
 parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)',
                     dest='weight_decay')
-parser.add_argument('-p', '--print-freq', default=10, type=int,
-                    metavar='N', help='print frequency (default: 10)')
+parser.add_argument('-p', '--print-freq', default=100, type=int,
+                    metavar='N', help='print frequency (default: 100)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
@@ -71,6 +72,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
+parser.add_argument('--version', default='default', type=str, help='specify the type of repVgg to use')
 
 best_acc1 = 0
 
@@ -145,7 +147,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     repvgg_build_func = get_RepVGG_func_by_name(args.arch)
 
-    model = repvgg_build_func(deploy=False)
+    model = repvgg_build_func(deploy=False, version=args.version)
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -161,7 +163,7 @@ def main_worker(gpu, ngpus_per_node, args):
             # ourselves based on the total number of GPUs we have
             args.batch_size = int(args.batch_size / ngpus_per_node)
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         else:
             model.cuda()
             # DistributedDataParallel will divide and allocate batch_size to all
